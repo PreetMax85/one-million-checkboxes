@@ -16,7 +16,6 @@ Demo video: [YouTube link](https://youtu.be/c9xvWC9kgNI)
 | State storage | Redis (bitmap + hash + sorted set) |
 | Auth | Custom OIDC provider — Authorization Code Flow + PKCE |
 | Sessions | express-session |
-| Deployment | Render |
 
 ---
 
