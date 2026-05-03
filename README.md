@@ -1,8 +1,7 @@
 # One Million Checkboxes ☑️
 
 A real-time collaborative web app where users interact with a grid of 1,000,000 checkboxes. Built from scratch with WebSockets, Redis, custom rate limiting, and OIDC authentication.
-
-Live demo: [your-app.onrender.com](https://your-app.onrender.com)  
+ 
 Demo video: [YouTube link](https://youtube.com)
 
 ---
@@ -32,7 +31,6 @@ Demo video: [YouTube link](https://youtube.com)
 - **Redis Pub/Sub** — scales across multiple server instances
 - **OIDC authentication** — Authorization Code Flow with PKCE (S256)
 - **State persistence** — Redis bitmap survives page refreshes and server restarts
-- **Anonymous read** — anyone can watch in real-time; login to play
 
 ---
 
@@ -79,11 +77,12 @@ NODE_ENV=development
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
-SESSION_SECRET=          # generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+SESSION_SECRET= # generate using:
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 AUTH_ISSUER=https://custom-oidc-provider.onrender.com
-CLIENT_ID=               # from OIDC provider client registration
-CLIENT_SECRET=           # from OIDC provider client registration
+CLIENT_ID= # from OIDC provider client registration
+CLIENT_SECRET= # from OIDC provider client registration
 REDIRECT_URI=http://localhost:8000/auth/callback
 ```
 
@@ -197,22 +196,3 @@ After N seconds: key expires automatically → counter resets → new window sta
 **Why not set EXPIRE on every hit?** That would keep resetting the window — the counter would never expire. Setting it only when `count === 1` means the window is fixed: starts on first request, resets N seconds later regardless of activity.
 
 ---
-
-## Screenshots
-
-> Add screenshots here before submission
-
----
-
-## Project Structure
-
-```
-├── public/
-│   └── index.html          # frontend — virtual scroll, socket client, auth UI
-├── index.js                # Express server, Socket.IO, Redis, auth routes
-├── rate-limiter.js         # custom rate limiting (WS + HTTP)
-├── redis-connection.js     # three Redis connections (read/write, pub, sub)
-├── docker-compose.yml      # Valkey (Redis) for local dev
-├── .env.example            # environment variable template
-└── package.json
-```
