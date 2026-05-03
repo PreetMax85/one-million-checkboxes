@@ -2,7 +2,7 @@
 
 A real-time collaborative web app where users interact with a grid of 1,000,000 checkboxes. Built from scratch with WebSockets, Redis, custom rate limiting, and OIDC authentication.
  
-Demo video: [YouTube link](https://youtube.com)
+Demo video: [YouTube link](https://youtu.be/c9xvWC9kgNI)
 
 ---
 
