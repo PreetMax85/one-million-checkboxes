@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>One Million Checkboxes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg:          #080808;
+        --surface:     #0f0f0f;
+        --surface2:    #141414;
+        --border:      #1e1e1e;
+        --accent:      #c8f135;
+        --accent-dim:  rgba(200, 241, 53, 0.10);
+        --accent-glow: rgba(200, 241, 53, 0.30);
+        --text:        #e8e8e8;
+        --muted:       #888;
+        --danger:      #ff4444;
+        --box-size:    28px;
+        --box-gap:     5px;
+        --header-h:    64px;
+      }
+
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Share Tech Mono", monospace;
+        overflow: hidden;
+      }
+
+      /* scanline texture */
+      body::before {
+        content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 200;
+        background: repeating-linear-gradient(
+          0deg, transparent, transparent 2px,
+          rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px
+        );
+      }
+
+      /* ── HEADER ─────────────────────────────────── */
+      header {
+        position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+        height: var(--header-h);
+        background: rgba(8,8,8,0.95);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--border);
+        padding: 0 20px;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .header-left { display: flex; align-items: center; gap: 10px; }
+
+      .x-link {
+        display: flex; align-items: center; justify-content: center;
+        width: 32px; height: 32px;
+        border: 1px solid var(--border); border-radius: 6px;
+        color: var(--muted); text-decoration: none; flex-shrink: 0;
+        transition: color .15s, border-color .15s, background .15s, box-shadow .15s;
+      }
+      .x-link:hover {
+        color: var(--accent); border-color: var(--accent);
+        background: var(--accent-dim); box-shadow: 0 0 10px var(--accent-glow);
+      }
+      .x-link svg { width: 15px; height: 15px; fill: currentColor; }
+
+      .byline { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; line-height: 1.5; }
+      .byline .label { color: var(--muted); }
+      .byline strong { color: var(--text); font-size: 13px; display: block; letter-spacing: .04em; }
+
+      h1 {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: clamp(20px, 3vw, 40px);
+        letter-spacing: .08em; color: var(--accent);
+        text-shadow: 0 0 20px var(--accent-glow);
+        white-space: nowrap; text-align: center; line-height: 1;
+      }
+
+      .header-right {
+        display: flex; align-items: center; gap: 10px;
+        justify-content: flex-end; flex-wrap: nowrap;
+      }
+
+      .stat {
+        font-size: 9px; color: var(--muted); letter-spacing: .1em;
+        text-transform: uppercase;
+        display: flex; flex-direction: column; align-items: center; gap: 1px;
+        flex-shrink: 0;
+      }
+      .stat span { color: var(--accent); font-size: 14px; letter-spacing: .03em; }
+
+      .divider { color: var(--border); font-size: 18px; }
+
+      .online-pill {
+        display: flex; align-items: center; gap: 5px;
+        font-size: 10px; color: var(--muted); letter-spacing: .08em;
+        padding: 4px 9px; border: 1px solid var(--border); border-radius: 20px;
+        flex-shrink: 0;
+      }
+      .conn-dot {
+        width: 7px; height: 7px; border-radius: 50%;
+        background: var(--danger);
+        transition: background .4s, box-shadow .4s;
+      }
+      .conn-dot.live {
+        background: var(--accent);
+        box-shadow: 0 0 6px var(--accent-glow);
+        animation: pulse 2s ease infinite;
+      }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
+      .lb-btn {
+        font-family: "Share Tech Mono", monospace;
+        font-size: 11px; letter-spacing: .06em;
+        padding: 6px 12px; border-radius: 5px; cursor: pointer;
+        background: transparent; color: var(--muted);
+        border: 1px solid var(--border);
+        transition: all .15s; flex-shrink: 0;
+      }
+      .lb-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+      #auth-area { flex-shrink: 0; }
+
+      .auth-btn {
+        font-family: "Share Tech Mono", monospace;
+        font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+        padding: 6px 14px; border-radius: 5px; cursor: pointer;
+        transition: all .15s; border: none;
+      }
+      .auth-btn.login {
+        background: transparent; color: var(--accent);
+        border: 1px solid var(--accent);
+      }
+      .auth-btn.login:hover {
+        background: var(--accent); color: #080808;
+        box-shadow: 0 0 14px var(--accent-glow);
+      }
+      .auth-btn.logout {
+        background: transparent; color: var(--muted);
+        border: 1px solid var(--border);
+      }
+      .auth-btn.logout:hover { border-color: var(--danger); color: var(--danger); }
+
+      .my-color-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        display: inline-block; flex-shrink: 0;
+      }
+      .user-info {
+        display: flex; align-items: center; gap: 7px;
+        font-size: 11px; color: var(--muted); letter-spacing: .06em;
+      }
+      .user-info .name { color: var(--text); }
+
+      /* ── VIEWPORT — top = header only (no feed bar) ─ */
+      #viewport {
+        position: fixed;
+        top: var(--header-h);   /* just below header — no feed bar */
+        left: 0; right: 0; bottom: 0;
+        overflow-y: scroll; overflow-x: hidden;
+      }
+
+      /* Loading overlay */
+      #loading {
+        position: absolute; inset: 0; z-index: 10;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 16px; background: var(--bg);
+        transition: opacity .3s;
+      }
+      #loading.hidden { opacity: 0; pointer-events: none; }
+      .spinner {
+        width: 30px; height: 30px;
+        border: 2px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin .6s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      #loading p { font-size: 11px; color: var(--muted); letter-spacing: .1em; }
+
+      #spacer { position: relative; width: 100%; }
+      #visible-layer {
+        position: absolute; top: 0; left: 0;
+        padding: 20px;
+        display: flex; flex-wrap: wrap; gap: var(--box-gap);
+        width: 100%;
+      }
+
+      /* ── CHECKBOXES ──────────────────────────────── */
+      /*
+        CSS custom properties on each element:
+          --check-color → the user's personal HSL color
+          --check-glow  → same color at 35% opacity for glow
+
+        :checked reads these vars. If unset → falls back to --accent.
+        This gives each user a unique color without any CSS class changes.
+      */
+      input[type="checkbox"] {
+        appearance: none; -webkit-appearance: none;
+        width: var(--box-size); height: var(--box-size);
+        border: 1px solid #1e1e1e;
+        background: var(--surface);
+        cursor: pointer; flex-shrink: 0;
+        transition: transform .06s, box-shadow .1s, background .06s, border-color .06s;
+        border-radius: 3px; position: relative;
+        display: inline-flex; align-items: center; justify-content: center;
+      }
+      input[type="checkbox"]:hover {
+        border-color: var(--check-color, var(--accent));
+        background: var(--accent-dim);
+        transform: scale(1.12);
+      }
+      input[type="checkbox"]:checked {
+        background:   var(--check-color, var(--accent));
+        border-color: var(--check-color, var(--accent));
+        box-shadow:
+          0 0 5px  var(--check-glow, var(--accent-glow)),
+          0 0 12px var(--check-glow, var(--accent-glow));
+        animation: checkPop .18s ease-out;
+      }
+      @keyframes checkPop {
+        0%   { transform: scale(1.0); }
+        50%  { transform: scale(1.2); }
+        100% { transform: scale(1.0); }
+      }
+      input[type="checkbox"]:checked::after {
+        content: ""; display: block;
+        width: 36%; height: 60%;
+        border-right: 2px solid rgba(0,0,0,0.6);
+        border-bottom: 2px solid rgba(0,0,0,0.6);
+        transform: rotate(45deg) translate(-1px, -2px);
+      }
+
+      /* ── LEADERBOARD PANEL ───────────────────────── */
+      #lb-panel {
+        position: fixed; top: var(--header-h); right: 0; bottom: 0;
+        width: 260px; z-index: 95;
+        background: rgba(9,9,9,0.97);
+        border-left: 1px solid var(--border);
+        backdrop-filter: blur(12px);
+        transform: translateX(100%);
+        transition: transform .25s cubic-bezier(.4,0,.2,1);
+        display: flex; flex-direction: column;
+      }
+      #lb-panel.open { transform: translateX(0); }
+
+      .lb-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex; justify-content: space-between; align-items: center;
+        flex-shrink: 0;
+      }
+      .lb-title {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 22px; letter-spacing: .08em; color: var(--accent);
+      }
+      .lb-close {
+        background: none; border: none; color: var(--muted);
+        cursor: pointer; font-size: 18px; transition: color .15s; line-height: 1;
+      }
+      .lb-close:hover { color: var(--text); }
+
+      #lb-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+      #lb-list::-webkit-scrollbar { width: 3px; }
+      #lb-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+      .lb-entry {
+        display: flex; align-items: center; gap: 10px;
+        padding: 9px 20px; transition: background .1s;
+      }
+      .lb-entry:hover { background: var(--surface); }
+      .lb-rank { font-size: 11px; color: var(--muted); width: 16px; flex-shrink: 0; text-align: right; }
+      .lb-dot  { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+      .lb-name {
+        flex: 1; font-size: 12px; color: var(--text); letter-spacing: .04em;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .lb-score { font-size: 12px; color: var(--muted); flex-shrink: 0; letter-spacing: .04em; }
+
+      #lb-mine {
+        padding: 14px 20px;
+        border-top: 1px solid var(--border);
+        font-size: 11px; color: var(--muted); letter-spacing: .06em;
+        display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+      }
+      #lb-mine .mine-score { color: var(--accent); font-size: 13px; }
+
+      /* ── TOASTS ──────────────────────────────────── */
+      #toast-container {
+        position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+        z-index: 300; display: flex; flex-direction: column-reverse; gap: 8px;
+        align-items: center; pointer-events: none;
+      }
+      .toast {
+        font-size: 12px; letter-spacing: .06em;
+        padding: 9px 20px; border-radius: 6px;
+        animation: toastIn .2s ease, toastOut .3s ease 2.5s forwards;
+        max-width: 320px; text-align: center;
+      }
+      .toast.error { background: #ff4444; color: #fff; }
+      .toast.warn  { background: rgba(200,241,53,.12); border: 1px solid var(--accent); color: var(--accent); }
+      .toast.info  { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
+      @keyframes toastIn  { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+      @keyframes toastOut { to   { opacity:0; transform:translateY(4px); } }
+    </style>
+  </head>
+
+  <body>
+    <!-- ── HEADER ──────────────────────────────────── -->
+    <header>
+      <div class="header-left">
+        <a class="x-link" href="https://x.com/preetwt" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.73-8.835L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
+        <div class="byline">
+          <span class="label">a website by</span>
+          <strong>Preet</strong>
+        </div>
+      </div>
+
+      <h1>One Million Checkboxes</h1>
+
+      <div class="header-right">
+        <div class="stat">Checked<span id="checked-count">0</span></div>
+        <span class="divider">|</span>
+        <div class="stat">Left<span id="remaining-count">1,000,000</span></div>
+        <span class="divider">|</span>
+        <div class="online-pill">
+          <div class="conn-dot" id="conn-dot"></div>
+          <span id="users-count">—</span>
+        </div>
+        <button class="lb-btn" onclick="toggleLeaderboard()">🏆 Board</button>
+        <div id="auth-area"></div>
+      </div>
+    </header>
+
+    <!-- ── VIRTUAL SCROLL ──────────────────────────── -->
+    <div id="viewport">
+      <div id="loading">
+        <div class="spinner"></div>
+        <p>Loading 1,000,000 checkboxes…</p>
+      </div>
+      <div id="spacer">
+        <div id="visible-layer"></div>
+      </div>
+    </div>
+
+    <!-- ── LEADERBOARD PANEL ───────────────────────── -->
+    <div id="lb-panel">
+      <div class="lb-header">
+        <div class="lb-title">Leaderboard</div>
+        <button class="lb-close" onclick="toggleLeaderboard()">✕</button>
+      </div>
+      <div id="lb-list">
+        <div style="padding:20px; font-size:11px; color:var(--muted)">Loading…</div>
+      </div>
+      <div id="lb-mine" style="display:none"></div>
+    </div>
+
+    <!-- ── TOASTS ──────────────────────────────────── -->
+    <div id="toast-container"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+    // ═══════════════════════════════════════════════
+    // CONSTANTS
+    // ═══════════════════════════════════════════════
+    const CHECKBOX_COUNT = 1_000_000;
+
+    // BOX_SIZE must match CSS: --box-size (28px) + --box-gap (5px) = 33px
+    // Virtual scroll uses this to calculate which row is visible.
+    const BOX_SIZE    = 33;
+    const BUFFER_ROWS = 4; // extra rows above/below viewport to pre-render
+
+    // ═══════════════════════════════════════════════
+    // STATE
+    // ═══════════════════════════════════════════════
+
+    // checkedState: 1-based index → true/false
+    // Single source of truth. Populated from /api/state on load.
+    // Updated by both own clicks (optimistic) and incoming socket events.
+    const checkedState = new Map();
+
+    // colorState: 1-based index → "hsl(...)"
+    // Which color each checked box has. Set when a box is checked,
+    // deleted when unchecked.
+    const colorState   = new Map();
+
+    let checkedCount = 0;
+    let isAuthed     = false;
+    let myName       = null;
+    let myColor      = null; // my personal hsl color, set by server:auth-status
+    let myScore      = 0;
+
+    // Virtual scroll layout state
+    let cols      = 0;
+    let totalRows = 0;
+    let rendered  = { start: -1, end: -1 };
+
+    // ═══════════════════════════════════════════════
+    // DOM REFS
+    // ═══════════════════════════════════════════════
+    const viewport  = document.getElementById("viewport");
+    const spacer    = document.getElementById("spacer");
+    const layer     = document.getElementById("visible-layer");
+    const loadingEl = document.getElementById("loading");
+    const checkedEl = document.getElementById("checked-count");
+    const remainEl  = document.getElementById("remaining-count");
+    const connDot   = document.getElementById("conn-dot");
+    const usersEl   = document.getElementById("users-count");
+    const authArea  = document.getElementById("auth-area");
+
+    // ═══════════════════════════════════════════════
+    // HELPERS
+    // ═══════════════════════════════════════════════
+
+    // hslToGlow: "hsl(120, 80%, 62%)" → "hsla(120, 80%, 62%, 0.35)"
+    function hslToGlow(hsl) {
+      if (!hsl) return "transparent";
+      return hsl.replace("hsl(", "hsla(").replace(")", ", 0.35)");
+    }
+
+    // applyColorToInput: sets CSS custom properties on a checkbox element.
+    // The :checked CSS rule reads --check-color and --check-glow from the element.
+    // If color is null → removes properties → falls back to global --accent.
+    function applyColorToInput(input, color) {
+      if (color) {
+        input.style.setProperty("--check-color", color);
+        input.style.setProperty("--check-glow",  hslToGlow(color));
+      } else {
+        input.style.removeProperty("--check-color");
+        input.style.removeProperty("--check-glow");
+      }
+    }
+
+    function updateStats() {
+      checkedEl.textContent = checkedCount.toLocaleString();
+      remainEl.textContent  = (CHECKBOX_COUNT - checkedCount).toLocaleString();
+    }
+
+    // ═══════════════════════════════════════════════
+    // TOAST
+    // ═══════════════════════════════════════════════
+    function showToast(msg, type = "info") {
+      const el     = document.createElement("div");
+      el.className = `toast ${type}`;
+      el.textContent = msg;
+      document.getElementById("toast-container").appendChild(el);
+      setTimeout(() => el.remove(), 2850);
+    }
+
+    // ═══════════════════════════════════════════════
+    // AUTH UI
+    // ═══════════════════════════════════════════════
+    function renderAuthUI() {
+      if (isAuthed && myColor) {
+        const glowStyle = `background:${myColor}; box-shadow:0 0 8px ${hslToGlow(myColor)}`;
+        authArea.innerHTML = `
+          <div class="user-info">
+            <span class="my-color-dot" style="${glowStyle}"></span>
+            <span class="name">${myName}</span>
+            <button class="auth-btn logout" onclick="location.href='/auth/logout'">Logout</button>
+          </div>`;
+      } else {
+        authArea.innerHTML = `
+          <button class="auth-btn login" onclick="location.href='/auth/login'">
+            🎨 Claim your color
+          </button>`;
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    // LEADERBOARD
+    // ═══════════════════════════════════════════════
+    const lbPanel = document.getElementById("lb-panel");
+
+    function toggleLeaderboard() {
+      const isOpen = lbPanel.classList.toggle("open");
+      if (isOpen) loadLeaderboard();
+    }
+
+    async function loadLeaderboard() {
+      const list = document.getElementById("lb-list");
+      try {
+        const data = await fetch("/api/leaderboard").then(r => r.json());
+        if (!Array.isArray(data) || data.length === 0) {
+          list.innerHTML = `<div style="padding:20px;font-size:11px;color:var(--muted)">No activity yet!</div>`;
+          return;
+        }
+        const rankLabel = (i) => ["🥇","🥈","🥉"][i] ?? `${i + 1}.`;
+        list.innerHTML = data.map((e, i) => `
+          <div class="lb-entry">
+            <div class="lb-rank">${rankLabel(i)}</div>
+            <div class="lb-dot" style="background:${e.color};box-shadow:0 0 5px ${hslToGlow(e.color)}"></div>
+            <div class="lb-name">${e.name}</div>
+            <div class="lb-score">${e.score.toLocaleString()}</div>
+          </div>`).join("");
+      } catch {
+        list.innerHTML = `<div style="padding:20px;font-size:11px;color:var(--muted)">Failed to load.</div>`;
+      }
+    }
+
+    async function loadMyScore() {
+      if (!isAuthed) return;
+      try {
+        const { score } = await fetch("/api/my-score").then(r => r.json());
+        myScore = score ?? 0;
+        const lbMine = document.getElementById("lb-mine");
+        const dotStyle = myColor ? `background:${myColor};box-shadow:0 0 5px ${hslToGlow(myColor)}` : "";
+        lbMine.style.display = "flex";
+        lbMine.innerHTML = `
+          <span class="my-color-dot" style="${dotStyle}"></span>
+          <span>Your toggles:</span>
+          <span class="mine-score">${myScore.toLocaleString()}</span>`;
+      } catch { /* ignore */ }
+    }
+
+    // ═══════════════════════════════════════════════
+    // VIRTUAL SCROLL
+    // ═══════════════════════════════════════════════
+
+    // calcLayout: measures viewport width → calculates columns and total rows.
+    // Must run on init and on every resize.
+    function calcLayout() {
+      const w = viewport.clientWidth - 40; // 40 = 20px padding on each side
+      cols      = Math.max(1, Math.floor(w / BOX_SIZE));
+      totalRows = Math.ceil(CHECKBOX_COUNT / cols);
+      // Set spacer height so the scrollbar represents the full grid
+      spacer.style.height = (totalRows * BOX_SIZE + 40) + "px";
+    }
+
+    // visibleRowRange: returns which rows are currently in the viewport
+    // (plus BUFFER_ROWS above and below for smooth scrolling).
+    function visibleRowRange() {
+      const scrollTop = viewport.scrollTop;
+      const viewH     = viewport.clientHeight;
+      const first = Math.max(0, Math.floor(scrollTop / BOX_SIZE) - BUFFER_ROWS);
+      const last  = Math.min(totalRows - 1, Math.ceil((scrollTop + viewH) / BOX_SIZE) + BUFFER_ROWS);
+      return { first, last };
+    }
+
+    // render: builds DOM nodes only for the visible row range.
+    // Destroys and rebuilds when range changes (on scroll/resize).
+    // Never more than ~300 DOM nodes for a 1M checkbox grid.
+    function render() {
+      const { first, last } = visibleRowRange();
+      if (first === rendered.start && last === rendered.end) return; // no change
+
+      const firstIdx = first * cols + 1;                         // 1-based
+      const lastIdx  = Math.min(CHECKBOX_COUNT, (last + 1) * cols);
+
+      layer.innerHTML = "";
+      // Position the layer at the correct pixel offset in the spacer.
+      // Without this, all checkboxes would render at the top regardless of scroll.
+      layer.style.top = (first * BOX_SIZE + 20) + "px";
+
+      const frag = document.createDocumentFragment();
+      for (let i = firstIdx; i <= lastIdx; i++) {
+        const input = document.createElement("input");
+        input.type  = "checkbox";
+        input.id    = `cb-${i}`;
+        input.value = i;  // 1-based — matches what server stores in colorState
+
+        if (checkedState.get(i)) {
+          input.checked = true;
+          applyColorToInput(input, colorState.get(i) ?? null);
+        }
+
+        frag.appendChild(input);
+      }
+
+      layer.appendChild(frag);
+      rendered = { start: first, end: last };
+    }
+
+    viewport.addEventListener("scroll", render, { passive: true });
+    window.addEventListener("resize", () => { calcLayout(); render(); });
+
+    // ═══════════════════════════════════════════════
+    // CHECKBOX TOGGLE (own click)
+    // ═══════════════════════════════════════════════
+    layer.addEventListener("change", (e) => {
+      // Type check first — always.
+      if (e.target.type !== "checkbox") return;
+
+      const index   = parseInt(e.target.value); // 1-based
+      const checked = e.target.checked;
+
+      // Skip if state hasn't actually changed (browser quirk guard).
+      const prev = checkedState.get(index) ?? false;
+      if (prev === checked) return;
+
+      // Optimistic update — don't wait for server echo.
+      // The server excludes us from the broadcast (socketId fix),
+      // so we won't get a duplicate event back.
+      checkedState.set(index, checked);
+
+      if (checked) {
+        // myColor could be null (anon) — applyColorToInput handles null gracefully.
+        colorState.set(index, myColor);
+        applyColorToInput(e.target, myColor);
+        checkedCount++;
+      } else {
+        colorState.delete(index);
+        applyColorToInput(e.target, null);
+        checkedCount--;
+      }
+
+      updateStats();
+      socket.emit("client:checkbox:change", { index, checked });
+
+      // Optimistically bump my score display
+      if (isAuthed) {
+        myScore++;
+        const el = document.querySelector(".mine-score");
+        if (el) el.textContent = myScore.toLocaleString();
+      }
+    });
+
+    // ═══════════════════════════════════════════════
+    // SOCKET.IO
+    // ═══════════════════════════════════════════════
+    const socket = io();
+
+    socket.on("connect", () => {
+      connDot.classList.add("live");
+    });
+
+    socket.on("disconnect", () => {
+      connDot.classList.remove("live");
+      showToast("Connection lost — reconnecting…", "warn");
+    });
+
+    // server:auth-status — sent immediately on connection.
+    // myColor is derived server-side from userId (stable) or socketId (anon).
+    socket.on("server:auth-status", ({ isAuthed: a, userName, myColor: c }) => {
+      isAuthed = a;
+      myName   = userName;
+      myColor  = c;
+      renderAuthUI();
+      if (isAuthed) loadMyScore();
+    });
+
+    // server:checkbox:change — ANOTHER user toggled a box.
+    // We are NOT the sender (server excludes us via socketId broadcast fix).
+    // So we can unconditionally apply this update — no double-count risk.
+    socket.on("server:checkbox:change", ({ index, checked, color }) => {
+      // Guard: only update if state actually changed.
+      // Handles edge cases like duplicate publishes.
+      const prev = checkedState.get(index) ?? false;
+      if (prev === checked) return;
+
+      checkedState.set(index, checked);
+
+      if (checked) {
+        colorState.set(index, color);
+        checkedCount++;
+      } else {
+        colorState.delete(index);
+        checkedCount--;
+      }
+
+      updateStats();
+
+      // If this box is currently rendered in the DOM, update it immediately.
+      const el = document.getElementById(`cb-${index}`);
+      if (el) {
+        el.checked = checked;
+        applyColorToInput(el, checked ? color : null);
+      }
+    });
+
+    socket.on("server:stats", ({ connectedUsers }) => {
+      usersEl.textContent = connectedUsers.toLocaleString();
+    });
+
+    socket.on("server:rate-limited", ({ message }) => {
+      showToast(message ?? "Too fast! Slow down.", "warn");
+    });
+
+    socket.on("server:error", ({ message }) => {
+      showToast(message, "error");
+    });
+
+    // ═══════════════════════════════════════════════
+    // INITIAL STATE LOAD
+    // ═══════════════════════════════════════════════
+
+    // Called once on page load. Fetches the full bitmap from Redis.
+    // Populates checkedState and colorState maps.
+    // Then re-renders so the viewport shows correct state.
+    async function loadInitialState() {
+      try {
+        const res = await fetch("/api/state");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const { bits, checkedCount: serverCount, colors } = await res.json();
+
+        // Use Redis BITCOUNT result — accurate and pre-computed.
+        checkedCount = serverCount ?? 0;
+
+        if (bits) {
+          const buf = Uint8Array.from(atob(bits), c => c.charCodeAt(0));
+
+          for (let i = 0; i < CHECKBOX_COUNT; i++) {
+            // Redis SETBIT uses 0-based offsets.
+            // We fixed server to do: setbit(key, index - 1, ...)
+            // So checkbox #1 → offset 0, checkbox #2 → offset 1, etc.
+            //
+            // Decoding:
+            //   byteIdx = which byte (8 bits per byte)
+            //   bitIdx  = which bit within that byte (7 = MSB, 0 = LSB)
+            //
+            // Redis stores MSB first, so offset 0 = bit 7 of byte 0.
+            // i=0: byte 0, bit 7 → offset 0 → checkedState.set(1)  ← checkbox #1 ✓
+            // i=1: byte 0, bit 6 → offset 1 → checkedState.set(2)  ← checkbox #2 ✓
+            const byteIdx = Math.floor(i / 8);
+            const bitIdx  = 7 - (i % 8);
+
+            if (buf[byteIdx] & (1 << bitIdx)) {
+              checkedState.set(i + 1, true); // i is 0-based, checkedState is 1-based
+            }
+          }
+        }
+
+        // Populate colorState from colors hash.
+        // Server stores: { "1": "hsl(...)", "42": "hsl(...)" } — 1-based keys.
+        if (colors) {
+          for (const [rawIndex, color] of Object.entries(colors)) {
+            colorState.set(parseInt(rawIndex), color);
+          }
+        }
+
+        updateStats();
+        rendered = { start: -1, end: -1 }; // force fresh render with loaded state
+        render();
+
+      } catch (err) {
+        showToast("Failed to load state — try refreshing", "error");
+        console.error("loadInitialState:", err);
+      } finally {
+        loadingEl.classList.add("hidden");
+        setTimeout(() => loadingEl.remove(), 350);
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════
+    async function init() {
+      // Check login status from HTTP session.
+      // myColor arrives separately via server:auth-status from socket.
+      try {
+        const me = await fetch("/auth/me").then(r => r.ok ? r.json() : null);
+        if (me) {
+          isAuthed = true;
+          myName   = me.name;
+        }
+      } catch { /* server warming up */ }
+
+      renderAuthUI();
+      calcLayout();
+      render();          // render empty grid immediately (fast)
+      loadInitialState(); // then fill in real state (async)
+    }
+
+    init();
+    </script>
+  </body>
+</html>
