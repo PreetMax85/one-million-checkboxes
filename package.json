@@ -1,5 +1,5 @@
 {
-  "name": "omcb-redis",
+  "name": "one-million-checkboxes",
   "version": "1.0.0",
   "description": "Real-time collaborative checkbox grid with color identity",
   "main": "index.js",
