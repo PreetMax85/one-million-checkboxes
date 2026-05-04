@@ -10,10 +10,11 @@ import { wsRateLimit, httpRateLimit } from "./rate-limiter.js";
 // ─────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────
-const CHECKBOX_STATE_KEY = "checkbox-state";
-const CHECKBOX_COLORS_KEY = "checkbox:colors"; // Redis hash: index → color
-const CHECKBOX_COUNT = 1_000_000;
-const PUBSUB_CHANNEL = "internal-server:checkbox:change";
+const CHECKBOX_STATE_KEY  = "checkbox-state";
+const CHECKBOX_COLORS_KEY = "checkbox:colors";   // Redis hash: index → color
+const CHECKBOX_COUNT      = 1_000_000;
+const PUBSUB_CHANNEL      = "internal-server:checkbox:change";
+
 
 // ─────────────────────────────────────────────
 // COLOR DERIVATION
@@ -33,22 +34,20 @@ const PUBSUB_CHANNEL = "internal-server:checkbox:change";
 function getUserColor(id) {
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
-    hash = (hash << 5) - hash + id.charCodeAt(i);
+    hash = ((hash << 5) - hash) + id.charCodeAt(i);
     hash |= 0; // clamp to 32-bit int (prevents float drift)
   }
-  const hue = Math.abs(hash) % 360;
-  const adjusted = hue >= 55 && hue <= 95 ? (hue + 130) % 360 : hue;
+  const hue      = Math.abs(hash) % 360;
+  const adjusted = (hue >= 55 && hue <= 95) ? (hue + 130) % 360 : hue;
   return `hsl(${adjusted}, 80%, 62%)`;
 }
 
+
 async function main() {
   const PORT = process.env.PORT ?? 8000;
-  const app = express();
+  const app    = express();
   const server = http.createServer(app);
-  const io = new Server(server, {
-    cors: { origin: "*" },
-    transports: ["websocket"], // skip polling entirely — go straight to WS
-  });
+  const io     = new Server(server, { cors: { origin: "*" } });
 
   // ── TRUST PROXY ───────────────────────────────────────────────
   // CRITICAL for Render/Railway/Heroku.
@@ -59,6 +58,7 @@ async function main() {
   // "1" = trust exactly one hop (the platform's LB).
   app.set("trust proxy", 1);
 
+
   // ── MIDDLEWARE ────────────────────────────────────────────────
   app.use(express.json());
 
@@ -68,13 +68,13 @@ async function main() {
   // places you get TWO separate session stores that don't talk to each
   // other. One variable = one store = one source of truth.
   const sessionMiddleware = session({
-    secret: process.env.SESSION_SECRET ?? "dev-secret-change-this",
-    resave: false,
+    secret:            process.env.SESSION_SECRET ?? "dev-secret-change-this",
+    resave:            false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 86400000, // 24 hours
+      secure:   process.env.NODE_ENV === "production",
+      maxAge:   86400000, // 24 hours
       // sameSite: 'lax' = send cookie on top-level cross-site GET navigations.
       // This is what OAuth redirect flows are — browser leaves your site, goes to
       // the OIDC provider, then comes back. Without 'lax', some browsers drop the
@@ -98,6 +98,7 @@ async function main() {
   //   socket.request.session = { user: {...} } → auth works ✓
   io.engine.use(sessionMiddleware);
 
+
   // ── SOCKET.IO AUTH MIDDLEWARE ─────────────────────────────────
   // Now socket.request.session is populated (because io.engine.use above).
   // This middleware runs after the handshake, before "connection" fires.
@@ -105,12 +106,13 @@ async function main() {
   io.use((socket, next) => {
     const user = socket.request.session?.user;
     if (user) {
-      socket.data.userId = user.id;
+      socket.data.userId   = user.id;
       socket.data.userName = user.name;
     }
     // Always call next() — anon users connect too, just get socketId-based color.
     next();
   });
+
 
   // ── REDIS PUB/SUB ─────────────────────────────────────────────
   await subscriber.subscribe(PUBSUB_CHANNEL);
@@ -138,8 +140,10 @@ async function main() {
     }
   });
 
+
   // ── CONNECTED USERS TRACKING ──────────────────────────────────
   let connectedUsers = 0;
+
 
   // ── SOCKET CONNECTION ─────────────────────────────────────────
   io.on("connection", (socket) => {
@@ -152,29 +156,25 @@ async function main() {
     socket.emit("server:auth-status", {
       isAuthed: !!socket.data.userId,
       userName: socket.data.userName ?? null,
-      userId: socket.data.userId ?? null,
-      myColor: getUserColor(socket.data.userId ?? socket.id),
+      userId:   socket.data.userId   ?? null,
+      myColor:  getUserColor(socket.data.userId ?? socket.id),
     });
 
-    console.log(
-      `[+] ${socket.id} | authed: ${!!socket.data.userId} | total: ${connectedUsers}`,
-    );
+    console.log(`[+] ${socket.id} | authed: ${!!socket.data.userId} | total: ${connectedUsers}`);
+
 
     // ── CHECKBOX TOGGLE ───────────────────────────────────────
     socket.on("client:checkbox:change", async (data) => {
+
       // 1. VALIDATE — never trust client input
       const { index, checked } = data;
       if (
-        typeof index !== "number" ||
+        typeof index   !== "number"  ||
         typeof checked !== "boolean" ||
-        index < 1 ||
-        index > CHECKBOX_COUNT ||
+        index < 1 || index > CHECKBOX_COUNT ||
         !Number.isInteger(index)
       ) {
-        socket.emit("server:error", {
-          code: "INVALID_DATA",
-          message: "Bad data.",
-        });
+        socket.emit("server:error", { code: "INVALID_DATA", message: "Bad data." });
         return;
       }
 
@@ -182,12 +182,9 @@ async function main() {
       // Authed → limit by userId (stable across reconnects)
       // Anon   → limit by socketId (per browser session)
       const limitKey = socket.data.userId ?? socket.id;
-      const allowed = await wsRateLimit(limitKey);
+      const allowed  = await wsRateLimit(limitKey);
       if (!allowed) {
-        socket.emit("server:rate-limited", {
-          message: "Too fast! Slow down.",
-          retryAfter: 1000,
-        });
+        socket.emit("server:rate-limited", { message: "Too fast! Slow down.", retryAfter: 1000 });
         return;
       }
 
@@ -219,8 +216,7 @@ async function main() {
       // ZINCRBY adds "increment" to member's score in a sorted set.
       // Redis keeps sorted sets automatically sorted — no manual sorting needed.
       // We track by displayName so the leaderboard is human-readable.
-      const displayName =
-        socket.data.userName ?? `Guest-${socket.id.slice(0, 6)}`;
+      const displayName = socket.data.userName ?? `Guest-${socket.id.slice(0, 6)}`;
       await redis.zincrby("leaderboard", 1, displayName);
 
       // 7. PUBLISH — tell ALL servers about this change
@@ -229,19 +225,17 @@ async function main() {
       // Include socketId so the subscriber can EXCLUDE the sender.
       // Without this, io.emit() in subscriber sends the event back to the
       // sender who already did an optimistic update → double state change.
-      await publisher.publish(
-        PUBSUB_CHANNEL,
-        JSON.stringify({
-          index,
-          checked,
-          color: checked ? color : null,
-          userName: displayName,
-          socketId: socket.id, // ← the sender's socket — subscriber will skip them
-        }),
-      );
+      await publisher.publish(PUBSUB_CHANNEL, JSON.stringify({
+        index,
+        checked,
+        color:    checked ? color : null,
+        userName: displayName,
+        socketId: socket.id,   // ← the sender's socket — subscriber will skip them
+      }));
 
       console.log(`[CB] ${displayName} → #${index} = ${checked} (${color})`);
     });
+
 
     // ── DISCONNECT ────────────────────────────────────────────
     socket.on("disconnect", (reason) => {
@@ -250,6 +244,7 @@ async function main() {
       console.log(`[-] ${socket.id} | ${reason} | total: ${connectedUsers}`);
     });
   });
+
 
   // ─────────────────────────────────────────────
   // HTTP ROUTES
@@ -267,16 +262,17 @@ async function main() {
       ]);
 
       res.json({
-        bits: buf ? buf.toString("base64") : "",
+        bits:         buf ? buf.toString("base64") : "",
         checkedCount: checkedCount ?? 0,
-        total: CHECKBOX_COUNT,
-        colors: colors ?? {}, // empty object if nothing toggled yet
+        total:        CHECKBOX_COUNT,
+        colors:       colors ?? {}, // empty object if nothing toggled yet
       });
     } catch (err) {
       console.error("/api/state error:", err);
       res.status(500).json({ error: "Failed to fetch state" });
     }
   });
+
 
   // GET /api/leaderboard — top 10 players
   // ZREVRANGE = sorted set from highest to lowest, positions 0–9
@@ -285,11 +281,11 @@ async function main() {
     try {
       // Redis returns: ["Preet", "42", "Hitesh", "18", ...]
       // Alternating: name at even index, score at odd index
-      const raw = await redis.zrevrange("leaderboard", 0, 9, "WITHSCORES");
+      const raw     = await redis.zrevrange("leaderboard", 0, 9, "WITHSCORES");
       const entries = [];
       for (let i = 0; i < raw.length; i += 2) {
         entries.push({
-          name: raw[i],
+          name:  raw[i],
           score: parseInt(raw[i + 1]),
           color: getUserColor(raw[i]), // show their color next to their name
         });
@@ -301,12 +297,14 @@ async function main() {
     }
   });
 
+
   // GET /api/my-score — personal toggle count for logged-in user
   app.get("/api/my-score", async (req, res) => {
     if (!req.session?.user) return res.json({ score: 0 });
     const score = await redis.zscore("leaderboard", req.session.user.name);
     res.json({ score: parseInt(score ?? 0) });
   });
+
 
   // GET /health
   app.get("/health", async (req, res) => {
@@ -317,6 +315,7 @@ async function main() {
       res.status(503).json({ healthy: false, error: "Redis unreachable" });
     }
   });
+
 
   // ── AUTH ROUTES — PKCE + OIDC Authorization Code Flow ───────────
   //
@@ -358,23 +357,23 @@ async function main() {
   // 2. Save verifier + state in session (server-side, not visible to browser)
   // 3. Redirect browser to OIDC /authorize with challenge + state
   app.get("/auth/login", (req, res) => {
-    const verifier = generateVerifier();
+    const verifier  = generateVerifier();
     const challenge = generateChallenge(verifier);
     // state = random CSRF token — must come back in callback unchanged
-    const state = crypto.randomBytes(16).toString("hex");
+    const state     = crypto.randomBytes(16).toString("hex");
 
     // Store both in session. These are read in /auth/callback.
     // session is server-side — browser only has an opaque cookie ID.
     req.session.pkce_verifier = verifier;
-    req.session.oauth_state = state;
+    req.session.oauth_state   = state;
 
     const params = new URLSearchParams({
-      client_id: process.env.CLIENT_ID,
-      redirect_uri: process.env.REDIRECT_URI,
-      response_type: "code",
-      scope: "openid profile email",
+      client_id:             process.env.CLIENT_ID,
+      redirect_uri:          process.env.REDIRECT_URI,
+      response_type:         "code",
+      scope:                 "openid profile email",
       state,
-      code_challenge: challenge,
+      code_challenge:        challenge,
       code_challenge_method: "S256", // SHA256 — only method your OIDC server accepts
     });
 
@@ -402,19 +401,14 @@ async function main() {
     // This is not paranoia — it's required by the OAuth 2.0 spec.
     if (!state || state !== req.session.oauth_state) {
       console.error("State mismatch — possible CSRF attack");
-      return res
-        .status(400)
-        .send("Invalid state parameter. Please try logging in again.");
+      return res.status(400).send("Invalid state parameter. Please try logging in again.");
     }
 
     if (!code) return res.status(400).send("Missing authorization code.");
 
     // Pull verifier from session — we need it for the token exchange.
     const verifier = req.session.pkce_verifier;
-    if (!verifier)
-      return res
-        .status(400)
-        .send("Missing PKCE verifier. Session may have expired.");
+    if (!verifier) return res.status(400).send("Missing PKCE verifier. Session may have expired.");
 
     // Clean up PKCE/state from session — one-time use only.
     delete req.session.pkce_verifier;
@@ -437,18 +431,18 @@ async function main() {
       // received undefined". JSON body fixes this.
       // (OIDC spec says form-encoded is standard, but custom servers can differ.)
       const tokenBody = {
-        grant_type: "authorization_code",
+        grant_type:    "authorization_code",
         code,
-        redirect_uri: process.env.REDIRECT_URI,
-        client_id: process.env.CLIENT_ID,
+        redirect_uri:  process.env.REDIRECT_URI,
+        client_id:     process.env.CLIENT_ID,
         client_secret: process.env.CLIENT_SECRET,
         code_verifier: verifier,
       };
 
       const tokenRes = await fetch(`${process.env.AUTH_ISSUER}/token`, {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(tokenBody),
+        body:    JSON.stringify(tokenBody),
       });
 
       // Log HTTP status so we can see if OIDC server returned 4xx/5xx
@@ -489,13 +483,14 @@ async function main() {
       // sub (subject) is the stable unique ID — use it as your user ID.
       // name comes from your OIDC server's userinfo response.
       req.session.user = {
-        id: user.sub,
+        id:    user.sub,
         email: user.email,
-        name: user.name ?? user.given_name ?? user.email, // fallback chain
+        name:  user.name ?? user.given_name ?? user.email, // fallback chain
       };
 
       // Redirect back to app — user is now logged in.
       res.redirect("/");
+
     } catch (err) {
       console.error("Auth callback error:", err);
       res.status(500).send("Authentication failed. Please try again.");
@@ -503,22 +498,22 @@ async function main() {
   });
 
   // GET /auth/logout
-  app.get("/auth/logout", (req, res) => {
-    req.session.destroy(async (err) => {
-      if (err) console.error("Session destroy error:", err);
+app.get("/auth/logout", (req, res) => {
+  req.session.destroy(async (err) => {
+    if (err) console.error("Session destroy error:", err);
 
-      // Clear the OIDC provider's SSO session too.
-      // Without this, the oidc_session cookie on onrender.com survives
-      // and the next login skips the login screen entirely.
-      try {
-        await fetch(`${process.env.AUTH_ISSUER}/logout`, { method: "POST" });
-      } catch {
-        // Don't block logout if provider is unreachable
-      }
+    // Clear the OIDC provider's SSO session too.
+    // Without this, the oidc_session cookie on onrender.com survives
+    // and the next login skips the login screen entirely.
+    try {
+      await fetch(`${process.env.AUTH_ISSUER}/logout`, { method: "POST" });
+    } catch {
+      // Don't block logout if provider is unreachable
+    }
 
-      res.redirect("/");
-    });
+    res.redirect("/");
   });
+});
 
   // GET /auth/me
   // Frontend calls this on page load to check login status.
@@ -531,6 +526,7 @@ async function main() {
     res.json(req.session.user);
   });
 
+
   // ── START + GRACEFUL SHUTDOWN ─────────────────────────────────
   server.listen(PORT, () => console.log(`Server → http://localhost:${PORT}`));
 
@@ -539,7 +535,7 @@ async function main() {
     server.close(() => process.exit(0));
   }
   process.on("SIGTERM", shutdown);
-  process.on("SIGINT", shutdown);
+  process.on("SIGINT",  shutdown);
 }
 
 main();
